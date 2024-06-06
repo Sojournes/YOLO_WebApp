@@ -3,7 +3,8 @@ import cv2
 import matplotlib.pyplot as plt
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
-import easyocr
+import pytesseract
+from pytesseract import Output
 import math
 import re
 
@@ -70,9 +71,6 @@ def non_maximum_supression(input_image,detections):
     return boxes_np, confidences_np, index
 
 def extract_text(image, bbox):
-    # Initialize the EasyOCR reader
-    reader = easyocr.Reader(['en'])
-    
     x, y, w, h = bbox
     roi = image[y:y+h, x:x+w]
     
@@ -81,28 +79,28 @@ def extract_text(image, bbox):
     else:
         # Resize the ROI to expand it along the x-axis to 150%
         new_w = int(w * 2)
-        new_h = int(h*1.2)
+        new_h = int(h * 1.2)
         resized_roi = cv2.resize(roi, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
         
-        # Use EasyOCR to extract text from the resized ROI
-        results = reader.readtext(resized_roi, detail=1)
+        # Use Tesseract to extract text and confidence scores from the resized ROI
+        custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789'
+        details = pytesseract.image_to_data(resized_roi, config=custom_config, output_type=Output.DICT)
         
-        if not results:
-            return '', 0.0
-        
-        # Extract text and confidence scores
         text_list = []
         confidence_list = []
         
-        for (bbox, text, confidence) in results:
-            text_list.append(text)
-            confidence_list.append(confidence)
+        for i in range(len(details['text'])):
+            text = details['text'][i]
+            conf = int(details['conf'][i])
+            if conf > 0:  # Filter out empty results
+                text_list.append(text)
+                confidence_list.append(conf)
 
         if not text_list:
-            return "",0
+            return "", 0
         
         # Join the text parts
-        text = ' '.join(text_list).strip()
+        text = ''.join(text_list).strip()
         
         # Calculate the average confidence score
         avg_confidence = sum(confidence_list) / len(confidence_list)
@@ -110,26 +108,24 @@ def extract_text(image, bbox):
         print(text, avg_confidence, "number")
         return text, avg_confidence
 
-
-def drawings(image,boxes_np,confidences_np,index):
+def drawings(image, boxes_np, confidences_np, index):
     # drawings
     if not boxes_np:
-        return image,"",0
+        return image, "", 0
     for ind in index:
-        x,y,w,h = boxes_np[ind]
+        x, y, w, h = boxes_np[ind]
         bb_conf = confidences_np[ind]
-        conf_text = 'plate: {:.0f}%'.format(bb_conf*100)
-        license_text, correct_factor = extract_text(image,boxes_np[ind])
+        conf_text = 'plate: {:.0f}%'.format(bb_conf * 100)
+        license_text, correct_factor = extract_text(image, boxes_np[ind])
         
-        cv2.rectangle(image,(x,y),(x+w,y+h),(255,0,255),2)
-        cv2.rectangle(image,(x,y-30),(x+w,y),(255,0,255),-1)
-        cv2.rectangle(image,(x,y+h),(x+w,y+h+30),(0,0,0),-1)
+        cv2.rectangle(image, (x, y), (x + w, y + h), (255, 0, 255), 2)
+        cv2.rectangle(image, (x, y - 30), (x + w, y), (255, 0, 255), -1)
+        cv2.rectangle(image, (x, y + h), (x + w, y + h + 30), (0, 0, 0), -1)
 
-        cv2.putText(image,conf_text,(x,y-10),cv2.FONT_HERSHEY_SIMPLEX,0.7,(255,255,255),1)
-        cv2.putText(image,license_text,(x,y+h+27),cv2.FONT_HERSHEY_SIMPLEX,0.7,(0,255,255),1)
+        cv2.putText(image, conf_text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 1)
+        cv2.putText(image, license_text, (x, y + h + 27), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 1)
         
-    return image,license_text,correct_factor
-
+    return image, license_text, correct_factor
 
 # predictions
 def yolo_predictions(img, net):
@@ -138,8 +134,8 @@ def yolo_predictions(img, net):
     ## step-2: NMS
     boxes_np, confidences_np, index = non_maximum_supression(input_image, detections)
     ## step-3: Drawings
-    result_img,text_result,correct_factor = drawings(img, boxes_np, confidences_np, index)
-    return result_img,text_result,correct_factor
+    result_img, text_result, correct_factor = drawings(img, boxes_np, confidences_np, index)
+    return result_img, text_result, correct_factor
 
 
 def rotate_y(img, y):
@@ -215,8 +211,8 @@ def process_images_with_yolo(img, net, angles):
 
     return best_image,correct_text
 
-angles = [-8,-4,4,8,12]
-
+angles = [-12,-11,-10,-9,-8,-7,-6,-5,-4,-3,-2,-1,1,2,3,4,5,6,7,8,9,10,11,12]
+# match and 
 
 def object_detection(path,filename):
     # read image
