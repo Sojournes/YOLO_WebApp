@@ -1,7 +1,6 @@
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
-import pytesseract as pt
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 import easyocr
