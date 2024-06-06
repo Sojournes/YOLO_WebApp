@@ -1,0 +1,10 @@
+numpy
+cv2
+matplotlib
+pytesseract
+os
+easyocr
+math
+re
+flask
+gunicorn
