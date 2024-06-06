@@ -2,9 +2,8 @@ numpy
 opencv-python
 matplotlib
 pytesseract
-os
+os-sys
 easyocr
-math
-re
+python-math
 flask
 gunicorn
